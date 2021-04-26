@@ -124,7 +124,7 @@ start_rules() {
 		;;
 	xray)
 		if [ ! -f "/tmp/v2ray" ];then
-			curl -k -s -o /tmp/xray --connect-timeout 10 --retry 3 https://outside.pages.dev/xray/xray
+			curl -k -s -o /tmp/v2ray --connect-timeout 10 --retry 3 https://outside.pages.dev/xray/xray
 		fi
 		;;
 	esac
