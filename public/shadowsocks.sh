@@ -100,6 +100,24 @@ local type=$stype
 		sed -i 's/\\//g' $v2_json_file
 		fi
 		;;
+	xray)
+		if [ ! -f "/tmp/xray" ]; then
+			logger -t "SS" "xray二进制文件下载失败，可能是地址失效或者网络异常！"
+			nvram set ss_enable=0
+			ssp_close
+		else
+			logger -t "SS" "xray二进制文件下载成功或者已存在"
+			chmod -R 777 /tmp/xray
+		fi
+		v2ray_enable=1
+		if [ "$2" = "1" ]; then
+		lua /etc_ro/ss/genv2config.lua $1 udp 1080 >/tmp/v2-ssr-reudp.json
+		sed -i 's/\\//g' /tmp/v2-ssr-reudp.json
+		else
+		lua /etc_ro/ss/genv2config.lua $1 tcp 1080 >$v2_json_file
+		sed -i 's/\\//g' $v2_json_file
+		fi
+		;;
 	esac
 }
 
@@ -122,6 +140,11 @@ start_rules() {
 	v2ray)
 		if [ ! -f "/tmp/v2ray" ];then
 			curl -k -s -o /tmp/v2ray --connect-timeout 10 --retry 3 https://outside.pages.dev/v2ray/v2ray
+		fi
+		;;
+	v2ray)
+		if [ ! -f "/tmp/xray" ];then
+			curl -k -s -o /tmp/xray --connect-timeout 10 --retry 3 https://outside.pages.dev/xray/xray
 		fi
 		;;
 	esac
@@ -239,6 +262,10 @@ start_redir_tcp() {
 		$bin -config $v2_json_file >/dev/null 2>&1 &
 		echo "$(date "+%Y-%m-%d %H:%M:%S") $($bin -version | head -1) 启动成功!" >>/tmp/ssrplus.log
 		;;
+	xray)
+		$bin -config $v2_json_file >/dev/null 2>&1 &
+		echo "$(date "+%Y-%m-%d %H:%M:%S") $($bin -version | head -1) 启动成功!" >>/tmp/ssrplus.log
+		;;	
 	socks5)
 		for i in $(seq 1 $threads); do
 		lua /etc_ro/ss/gensocks.lua $GLOBAL_SERVER 1080 >/dev/null 2>&1 &
@@ -265,6 +292,10 @@ start_redir_udp() {
 			$bin -c $last_config_file $ARG_OTA -U -f /var/run/ssr-reudp.pid >/dev/null 2>&1
 			;;
 		v2ray)
+			gen_config_file $UDP_RELAY_SERVER 1
+			$bin -config /tmp/v2-ssr-reudp.json >/dev/null 2>&1 &
+			;;
+		xray)
 			gen_config_file $UDP_RELAY_SERVER 1
 			$bin -config /tmp/v2-ssr-reudp.json >/dev/null 2>&1 &
 			;;
