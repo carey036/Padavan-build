@@ -23,6 +23,7 @@ redir_udp=0
 tunnel_enable=0
 local_enable=0
 pdnsd_enable_flag=0
+chinadnsng_enable_flag=0
 wan_bp_ips="/tmp/whiteip.txt"
 wan_fw_ips="/tmp/blackip.txt"
 lan_fp_ips="/tmp/lan_ip.txt"
@@ -39,9 +40,9 @@ find_bin() {
 	ssr) ret="/usr/bin/ssr-redir" ;;
 	ssr-local) ret="/usr/bin/ssr-local" ;;
 	ssr-server) ret="/usr/bin/ssr-server" ;;
-	v2ray) ret="/tmp/v2ray" ;;
-	xray) ret="/usr/bin/xray" ;;
-	trojan) ret="/tmp/trojan" ;;
+	v2ray) ret="/usr/bin/v2ray" ;;
+	xray) ret="/usr/bin/v2ray" ;;
+	trojan) ret="/usr/bin/trojan" ;;
 	socks5) ret="/usr/bin/ipt2socks" ;;
 	esac
 	echo $ret
@@ -66,15 +67,7 @@ local type=$stype
 		sed -i 's/\\//g' $config_file
 		;;
 	trojan)
-		if [ ! -f "/tmp/trojan" ]; then
-			logger -t "SS" "trojan二进制文件下载失败，可能是地址失效或者网络异常！"
-			nvram set ss_enable=0
-			ssp_close
-		else
-			logger -t "SS" "trojan二进制文件下载成功或者已存在"
-			chmod -R 777 /tmp/trojan
-		fi
-		#tj_file=$trojan_json_file
+		tj_bin="/usr/bin/trojan"
 		if [ "$2" = "0" ]; then
 		lua /etc_ro/ss/gentrojanconfig.lua $1 nat 1080 >$trojan_json_file
 		sed -i 's/\\//g' $trojan_json_file
@@ -84,14 +77,7 @@ local type=$stype
 		fi
 		;;
 	v2ray)
-		if [ ! -f "/tmp/v2ray" ]; then
-			logger -t "SS" "v2ray二进制文件下载失败，可能是地址失效或者网络异常！"
-			nvram set ss_enable=0
-			ssp_close
-		else
-			logger -t "SS" "v2ray二进制文件下载成功或者已存在"
-			chmod -R 777 /tmp/v2ray
-		fi
+		v2_bin="/usr/bin/v2ray"
 		v2ray_enable=1
 		if [ "$2" = "1" ]; then
 		lua /etc_ro/ss/genv2config.lua $1 udp 1080 >/tmp/v2-ssr-reudp.json
@@ -102,14 +88,7 @@ local type=$stype
 		fi
 		;;
 	xray)
-		if [ ! -f "/tmp/xray" ]; then
-			logger -t "SS" "xray二进制文件下载失败，可能是地址失效或者网络异常！"
-			nvram set ss_enable=0
-			ssp_close
-		else
-			logger -t "SS" "xray二进制文件下载成功或者已存在"
-			chmod -R 777 /tmp/xray
-		fi
+		v2_bin="/usr/bin/v2ray"
 		v2ray_enable=1
 		if [ "$2" = "1" ]; then
 		lua /etc_ro/ss/genxrayconfig.lua $1 udp 1080 >/tmp/v2-ssr-reudp.json
@@ -118,7 +97,7 @@ local type=$stype
 		lua /etc_ro/ss/genxrayconfig.lua $1 tcp 1080 >$v2_json_file
 		sed -i 's/\\//g' $v2_json_file
 		fi
-		;;
+		;;	
 	esac
 }
 
@@ -131,7 +110,7 @@ get_arg_out() {
 }
 
 start_rules() {
-	local stype=$(nvram get d_type)
+    local stype=$(nvram get d_type)
 	case "$stype" in
 	trojan)
 		if [ ! -f "/tmp/trojan" ];then
@@ -144,7 +123,7 @@ start_rules() {
 		fi
 		;;
 	xray)
-		if [ ! -f "/tmp/xray" ];then
+		if [ ! -f "/tmp/v2ray" ];then
 			curl -k -s -o /tmp/xray --connect-timeout 10 --retry 3 https://outside.pages.dev/xray/xray
 		fi
 		;;
@@ -299,7 +278,7 @@ start_redir_udp() {
 		xray)
 			gen_config_file $UDP_RELAY_SERVER 1
 			$bin -config /tmp/v2-ssr-reudp.json >/dev/null 2>&1 &
-			;;
+			;;	
 		trojan)
 			gen_config_file $UDP_RELAY_SERVER 1
 			$bin --config /tmp/trojan-ssr-reudp.json >/dev/null 2>&1 &
@@ -332,23 +311,24 @@ case "$run_mode" in
 		ipset -! restore </tmp/china.ipset 2>/dev/null
 		rm -f /tmp/china.ipset
 		if [ $(nvram get ss_chdns) = 1 ]; then
-		logger -t "SS" "下载cdn域名文件..."
-		wget --no-check-certificate --timeout=8 -qO - https://gitee.com/bkye/rules/raw/master/cdn.txt > /tmp/cdn.txt
-		if [ ! -f "/tmp/cdn.txt" ]; then
-        logger -t "SS" "cdn域名文件下载失败，可能是地址失效或者网络异常！可能会影响部分国内域名解析了国外的IP！"
-        else
-        logger -t "SS" "cdn域名文件下载成功"
-		fi
-		logger -st "SS" "启动chinadns..."
-		dns2tcp -L"127.0.0.1#5353" -R"$(nvram get tunnel_forward)" >/dev/null 2>&1 &
-		chinadns-ng -b 0.0.0.0 -l 65353 -c $(nvram get china_dns) -t 127.0.0.1#5353 -4 china -m /tmp/cdn.txt >/dev/null 2>&1 &
-	sed -i '/no-resolv/d' /etc/storage/dnsmasq/dnsmasq.conf
-sed -i '/server=127.0.0.1/d' /etc/storage/dnsmasq/dnsmasq.conf
-cat >> /etc/storage/dnsmasq/dnsmasq.conf << EOF
+			chinadnsng_enable_flag=1
+			logger -t "SS" "下载cdn域名文件..."
+			wget --no-check-certificate --timeout=8 -qO - https://gitee.com/bkye/rules/raw/master/cdn.txt > /tmp/cdn.txt
+			if [ ! -f "/tmp/cdn.txt" ]; then
+				logger -t "SS" "cdn域名文件下载失败，可能是地址失效或者网络异常！可能会影响部分国内域名解析了国外的IP！"
+			else
+				logger -t "SS" "cdn域名文件下载成功"
+			fi
+			logger -st "SS" "启动chinadns..."
+			dns2tcp -L"127.0.0.1#5353" -R"$(nvram get tunnel_forward)" >/dev/null 2>&1 &
+			chinadns-ng -b 0.0.0.0 -l 65353 -c $(nvram get china_dns) -t 127.0.0.1#5353 -4 china -M -m /tmp/cdn.txt >/dev/null 2>&1 &
+			sed -i '/no-resolv/d' /etc/storage/dnsmasq/dnsmasq.conf
+			sed -i '/server=127.0.0.1/d' /etc/storage/dnsmasq/dnsmasq.conf
+			cat >> /etc/storage/dnsmasq/dnsmasq.conf << EOF
 no-resolv
 server=127.0.0.1#65353
 EOF
-    fi
+    		fi
 	;;
 	gfw)
 		if [ $(nvram get pdnsd_enable) = 0 ]; then
@@ -380,22 +360,22 @@ EOF
 }
 
 start_AD() {
-mkdir -p /tmp/dnsmasq.dom
-curl -k -s -o /tmp/adnew.conf --connect-timeout 10 --retry 3 $(nvram get ss_adblock_url)
-if [ ! -f "/tmp/adnew.conf" ]; then
-logger -t "SS" "AD文件下载失败，可能是地址失效或者网络异常！"
-else
-logger -t "SS" "AD文件下载成功"
-if [ -f "/tmp/adnew.conf" ]; then
-check = `grep -wq "address=" /tmp/adnew.conf`
-  if [ ! -n "$check" ] ; then
-    cp /tmp/adnew.conf /tmp/dnsmasq.dom/ad.conf
-  else
-    cat /tmp/adnew.conf | grep ^\|\|[^\*]*\^$ | sed -e 's:||:address\=\/:' -e 's:\^:/0\.0\.0\.0:' > /tmp/dnsmasq.dom/ad.conf
-  fi
-fi
-fi
-rm -f /tmp/adnew.conf
+	mkdir -p /tmp/dnsmasq.dom
+	curl -k -s -o /tmp/adnew.conf --connect-timeout 10 --retry 3 $(nvram get ss_adblock_url)
+	if [ ! -f "/tmp/adnew.conf" ]; then
+		logger -t "SS" "AD文件下载失败，可能是地址失效或者网络异常！"
+	else
+		logger -t "SS" "AD文件下载成功"
+		if [ -f "/tmp/adnew.conf" ]; then
+			check = `grep -wq "address=" /tmp/adnew.conf`
+	  		if [ ! -n "$check" ] ; then
+	    			cp /tmp/adnew.conf /tmp/dnsmasq.dom/ad.conf
+	  		else
+			    cat /tmp/adnew.conf | grep ^\|\|[^\*]*\^$ | sed -e 's:||:address\=\/:' -e 's:\^:/0\.0\.0\.0:' > /tmp/dnsmasq.dom/ad.conf
+			fi
+		fi
+	fi
+	rm -f /tmp/adnew.conf
 }
 
 
@@ -461,10 +441,10 @@ rules() {
 
 start_watchcat() {
 	if [ $(nvram get ss_watchcat) = 1 ]; then
-		let total_count=server_count+redir_tcp+redir_udp+tunnel_enable+v2ray_enable+local_enable+pdnsd_enable_flag
+		let total_count=server_count+redir_tcp+redir_udp+tunnel_enable+v2ray_enable+local_enable+pdnsd_enable_flag+chinadnsng_enable_flag
 		if [ $total_count -gt 0 ]; then
 			#param:server(count) redir_tcp(0:no,1:yes)  redir_udp tunnel kcp local gfw
-			/usr/bin/ssr-monitor $server_count $redir_tcp $redir_udp $tunnel_enable $v2ray_enable $local_enable $pdnsd_enable_flag >/dev/null 2>&1 &
+			/usr/bin/ssr-monitor $server_count $redir_tcp $redir_udp $tunnel_enable $v2ray_enable $local_enable $pdnsd_enable_flag $chinadnsng_enable_flag >/dev/null 2>&1 &
 		fi
 	fi
 }
@@ -659,4 +639,3 @@ reserver)
 	#exit 0
 	;;
 esac
-
