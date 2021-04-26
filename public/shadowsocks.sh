@@ -23,7 +23,7 @@ redir_udp=0
 tunnel_enable=0
 local_enable=0
 pdnsd_enable_flag=0
-chinadnsng_enable_flag=0
+
 wan_bp_ips="/tmp/whiteip.txt"
 wan_fw_ips="/tmp/blackip.txt"
 lan_fp_ips="/tmp/lan_ip.txt"
@@ -40,9 +40,9 @@ find_bin() {
 	ssr) ret="/usr/bin/ssr-redir" ;;
 	ssr-local) ret="/usr/bin/ssr-local" ;;
 	ssr-server) ret="/usr/bin/ssr-server" ;;
-	v2ray) ret="/usr/bin/v2ray" ;;
-	xray) ret="/usr/bin/v2ray" ;;
-	trojan) ret="/usr/bin/trojan" ;;
+	v2ray) ret="/tmp/v2ray" ;;
+	xray) ret="/tmp/xray" ;;
+	trojan) ret="/tmp/trojan" ;;
 	socks5) ret="/usr/bin/ipt2socks" ;;
 	esac
 	echo $ret
@@ -67,7 +67,15 @@ local type=$stype
 		sed -i 's/\\//g' $config_file
 		;;
 	trojan)
-		tj_bin="/usr/bin/trojan"
+		if [ ! -f "/tmp/trojan" ]; then
+			logger -t "SS" "trojan二进制文件下载失败，可能是地址失效或者网络异常！"
+			nvram set ss_enable=0
+			ssp_close
+		else
+			logger -t "SS" "trojan二进制文件下载成功或者已存在"
+			chmod -R 777 /tmp/trojan
+		fi
+		#tj_file=$trojan_json_file
 		if [ "$2" = "0" ]; then
 		lua /etc_ro/ss/gentrojanconfig.lua $1 nat 1080 >$trojan_json_file
 		sed -i 's/\\//g' $trojan_json_file
@@ -77,7 +85,14 @@ local type=$stype
 		fi
 		;;
 	v2ray)
-		v2_bin="/usr/bin/v2ray"
+		if [ ! -f "/tmp/v2ray" ]; then
+			logger -t "SS" "v2ray二进制文件下载失败，可能是地址失效或者网络异常！"
+			nvram set ss_enable=0
+			ssp_close
+		else
+			logger -t "SS" "v2ray二进制文件下载成功或者已存在"
+			chmod -R 777 /tmp/v2ray
+		fi
 		v2ray_enable=1
 		if [ "$2" = "1" ]; then
 		lua /etc_ro/ss/genv2config.lua $1 udp 1080 >/tmp/v2-ssr-reudp.json
@@ -88,7 +103,14 @@ local type=$stype
 		fi
 		;;
 	xray)
-		v2_bin="/usr/bin/v2ray"
+		if [ ! -f "/tmp/xray" ]; then
+			logger -t "SS" "xray二进制文件下载失败，可能是地址失效或者网络异常！"
+			nvram set ss_enable=0
+			ssp_close
+		else
+			logger -t "SS" "xray二进制文件下载成功或者已存在"
+			chmod -R 777 /tmp/xray
+		fi
 		v2ray_enable=1
 		if [ "$2" = "1" ]; then
 		lua /etc_ro/ss/genxrayconfig.lua $1 udp 1080 >/tmp/v2-ssr-reudp.json
@@ -123,8 +145,8 @@ start_rules() {
 		fi
 		;;
 	xray)
-		if [ ! -f "/tmp/v2ray" ];then
-			curl -k -s -o /tmp/v2ray --connect-timeout 10 --retry 3 https://outside.pages.dev/xray/xray
+		if [ ! -f "/tmp/xray" ];then
+			curl -k -s -o /tmp/xray --connect-timeout 10 --retry 3 https://outside.pages.dev/xray/xray
 		fi
 		;;
 	esac
