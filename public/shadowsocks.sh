@@ -143,7 +143,7 @@ start_rules() {
 			curl -k -s -o /tmp/v2ray --connect-timeout 10 --retry 3 https://outside.pages.dev/v2ray/v2ray
 		fi
 		;;
-	v2ray)
+	xray)
 		if [ ! -f "/tmp/xray" ];then
 			curl -k -s -o /tmp/xray --connect-timeout 10 --retry 3 https://outside.pages.dev/xray/xray
 		fi
