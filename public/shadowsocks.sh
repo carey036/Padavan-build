@@ -93,6 +93,7 @@ local type=$stype
 			logger -t "SS" "v2ray二进制文件下载成功或者已存在"
 			chmod -R 777 /tmp/v2ray
 		fi
+		v2_bin="/usr/bin/v2ray"
 		v2ray_enable=1
 		if [ "$2" = "1" ]; then
 		lua /etc_ro/ss/genv2config.lua $1 udp 1080 >/tmp/v2-ssr-reudp.json
@@ -111,6 +112,7 @@ local type=$stype
 			logger -t "SS" "xray二进制文件下载成功或者已存在"
 			chmod -R 777 /tmp/xray
 		fi
+		v2_bin="/usr/bin/xray"
 		v2ray_enable=1
 		if [ "$2" = "1" ]; then
 		lua /etc_ro/ss/genxrayconfig.lua $1 udp 1080 >/tmp/v2-ssr-reudp.json
